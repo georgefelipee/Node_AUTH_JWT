@@ -4,10 +4,12 @@ const express = require('express')
 const mongoose = require('mongoose')
 const bcrypt = require('bcrypt')
 const jwt = require('jsonwebtoken')
+const cors = require('cors')
 
 const app = express()
 
 //Config JSON response
+app.use(cors())
 app.use(express.json()) // Aceitar JSON nas req e respostas
 
 //Models
@@ -53,6 +55,36 @@ function checkToken(req, res, next){
     }
 
 }
+app.post('/logout', async(req,res)=>{
+    console.log('usuario desconectado ')
+    res.end()
+
+})
+// Check token to REFRESH PAGE 
+app.post('/validate', async(req,res)=>{
+    const { token } = req.body
+    
+    if(!token){
+        return res.status(401).json({msg: "Faça Login"})
+    }
+
+    var payload
+    try {
+        const secret = process.env.SECRET
+        payload = jwt.verify(token, secret)
+        const user = await User.findById(payload.id,'-password')
+        res.status(200).json({msg:`Bem vindo ${payload.id}`,user})
+        
+    } catch (error) {
+        if ( error instanceof jwt.JsonWebTokenError){
+            return res.status(401).end()
+        }
+        return res.status(400).json({msg:{error}})
+    }
+
+    
+     
+})
 
 // Register User            //async //why await response for database
 app.post('/auth/register', async(req,res) =>{
@@ -70,7 +102,7 @@ app.post('/auth/register', async(req,res) =>{
 
     }
     if(password !== confirmpassword){
-        return res.status(422).json({msg: 'As senhas nao conferem! '})
+        return res.status(422).send({msg: 'As senhas nao conferem! '})
     }
 
     // check if user exists
@@ -79,7 +111,7 @@ app.post('/auth/register', async(req,res) =>{
     const userExist = await User.findOne({email: email})
 
     if(userExist){
-        return res.status(422).json({msg: 'Por favor, utilize outro E-MAIL !'})
+        return res.status(422).send({msg: 'E-mail ja cadastrado ! Por favor, utilize outro E-MAIL !'})
     }
 
     // create password
@@ -96,8 +128,8 @@ app.post('/auth/register', async(req,res) =>{
     try {
         
         await user.save()
-
-        res.status(201).json({msg: 'Usuario criado com sucesso!'})
+        console.log("Usuario Criado")
+        res.status(201).send({msg: 'Usuário criado com sucesso!'})
     } catch (error) {
         
         res.status(500).json({msg:'Acontenceu um erro no servidor! Tente novamente mais tarde'})
@@ -122,14 +154,14 @@ app.post('/auth/login', async(req,res)=>{
     const user = await User.findOne({email: email})
 
     if(!user){
-        return res.status(404).json({msg: 'Usuario nao encontrado ! '})
+        return res.status(404).send({msg: 'Usuário nao encontrado ! '})
     }
 
     //check if password match
     const checkPassword = await bcrypt.compare( password, user.password)
 
     if(!checkPassword){
-        return res.status(422).json({msg: 'Senha inválida! '})
+        return res.status(422).send({msg: 'Senha inválida! '})
     }
 
     try {
@@ -141,9 +173,9 @@ app.post('/auth/login', async(req,res)=>{
         secret,
        )
 
-       res.status(200).json({msg:"Autenticação realizada com sucesso !", token})
+       res.status(200).json({msg:"Autenticação realizada com sucesso !", token, user })
     } catch (error) {
-
+        console.log(error)
         res.status(500).json({msg:'Acontenceu um erro no servidor! Tente novamente mais tarde'})
     }
 
@@ -161,7 +193,7 @@ mongoose
     )
     .then(() => {
         console.log("Conectou ao banco")
-        app.listen(3000)
+        app.listen(3001)
     })
     .catch((err)=> console.log(err))
 
